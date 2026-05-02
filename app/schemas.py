@@ -31,7 +31,7 @@ class SequenceBase(BaseModel):
     name: str
     description: Optional[str] = None
     # Регулярка для валидации: только нуклеотиды ATGC (регистронезависимо)
-    raw_sequence: str = Field(..., pattern="^[ATGCatgc\s]+$")
+    raw_sequence: str = Field(..., pattern=r"^[ATGCatgc\s]+$")
     molecule_type: str = "DNA"
 
 class SequenceCreate(SequenceBase):
