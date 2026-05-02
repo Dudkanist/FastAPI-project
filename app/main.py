@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from . import models, schemas, auth, db
+from . import models, schemas, auth, db, bio_calc
 
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=db.engine)
@@ -62,18 +62,41 @@ def get_current_user(token: str = Depends(oauth2_scheme), database: Session = De
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
+
 @app.post("/sequences/", response_model=schemas.SequenceResponse, tags=["Sequences"])
 def create_sequence(
     sequence: schemas.SequenceCreate, 
     current_user: models.User = Depends(get_current_user),
     database: Session = Depends(db.get_db)
 ):
-    # Создаем запись в БД, привязанную к текущему юзеру
+    # 1. Сохраняем саму последовательность
     db_sequence = models.Sequence(
-        **sequence.model_dump(), 
+        name=sequence.name,
+        description=sequence.description,
+        raw_sequence=bio_calc.clean_sequence(sequence.raw_sequence), # Сразу чистим
+        molecule_type=sequence.molecule_type,
         owner_id=current_user.id
     )
     database.add(db_sequence)
     database.commit()
     database.refresh(db_sequence)
+    
+    # 2. Считаем параметры
+    gc = bio_calc.calculate_gc_content(db_sequence.raw_sequence)
+    tm = bio_calc.calculate_melting_temp(db_sequence.raw_sequence)
+    mw = bio_calc.calculate_molecular_weight(db_sequence.raw_sequence)
+    
+    # 3. Сохраняем результаты анализа и привязываем к сиквенсу
+    db_analysis = models.AnalysisResult(
+        sequence_id=db_sequence.id,
+        gc_content=gc,
+        melting_temp=tm,
+        molecular_weight=mw
+    )
+    database.add(db_analysis)
+    database.commit()
+    
+    # Обновляем объект, чтобы подтянуть анализ (благодаря relationship)
+    database.refresh(db_sequence) 
+    
     return db_sequence
