@@ -1,9 +1,10 @@
 from sqlalchemy import create_url, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from .config import settings
 
-# Путь к локальной базе данных
-SQLALCHEMY_DATABASE_URL = "sqlite:///./gene_vault.db"
+# Путь к локальной ДБ
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 # Создаем движок для подключения к базе
 # check_same_thread=False нужен для SQLite
