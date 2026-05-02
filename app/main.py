@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from . import models, schemas, auth, db
 
@@ -22,6 +23,57 @@ def register_user(user: schemas.UserCreate, database: Session = Depends(db.get_d
     database.refresh(new_user)
     return new_user
 
+@app.post("/token", tags=["Auth"])
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    database: Session = Depends(db.get_db)
+):
+    # Ищем пользователя по email (в OAuth2 поле называется username)
+    user = database.query(models.User).filter(models.User.email == form_data.username).first()
+    
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_01_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Создаем токен
+    access_token = auth.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.get("/", tags=["Healthcheck"])
 async def root():
     return {"status": "alive", "database": "connected"}
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def get_current_user(token: str = Depends(oauth2_scheme), database: Session = Depends(db.get_db)):
+    try:
+        payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except auth.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    user = database.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+@app.post("/sequences/", response_model=schemas.SequenceResponse, tags=["Sequences"])
+def create_sequence(
+    sequence: schemas.SequenceCreate, 
+    current_user: models.User = Depends(get_current_user),
+    database: Session = Depends(db.get_db)
+):
+    # Создаем запись в БД, привязанную к текущему юзеру
+    db_sequence = models.Sequence(
+        **sequence.model_dump(), 
+        owner_id=current_user.id
+    )
+    database.add(db_sequence)
+    database.commit()
+    database.refresh(db_sequence)
+    return db_sequence
