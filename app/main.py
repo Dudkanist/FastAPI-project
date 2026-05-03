@@ -100,3 +100,55 @@ def create_sequence(
     database.refresh(db_sequence) 
     
     return db_sequence
+
+from typing import List
+
+@app.get("/sequences/", response_model=List[schemas.SequenceResponse], tags=["Sequences"])
+def read_sequences(
+    skip: int = 0, limit: int = 100, 
+    current_user: models.User = Depends(get_current_user),
+    database: Session = Depends(db.get_db)
+):
+    # Отдаем только те сиквенсы, которые принадлежат текущему юзеру
+    sequences = database.query(models.Sequence).filter(
+        models.Sequence.owner_id == current_user.id
+    ).offset(skip).limit(limit).all()
+    return sequences
+
+@app.get("/sequences/{sequence_id}", response_model=schemas.SequenceResponse, tags=["Sequences"])
+def read_sequence(
+    sequence_id: int, 
+    current_user: models.User = Depends(get_current_user),
+    database: Session = Depends(db.get_db)
+):
+    sequence = database.query(models.Sequence).filter(
+        models.Sequence.id == sequence_id,
+        models.Sequence.owner_id == current_user.id
+    ).first()
+    
+    if sequence is None:
+        raise HTTPException(status_code=404, detail="Sequence not found")
+    return sequence
+
+@app.delete("/sequences/{sequence_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Sequences"])
+def delete_sequence(
+    sequence_id: int, 
+    current_user: models.User = Depends(get_current_user),
+    database: Session = Depends(db.get_db)
+):
+    sequence = database.query(models.Sequence).filter(
+        models.Sequence.id == sequence_id,
+        models.Sequence.owner_id == current_user.id
+    ).first()
+    
+    if sequence is None:
+        raise HTTPException(status_code=404, detail="Sequence not found")
+        
+    # Каскадное удаление (результаты анализа удалятся сами, если настроены правильно, 
+    # но в SQLite мы удалим явно)
+    if sequence.analysis:
+        database.delete(sequence.analysis)
+        
+    database.delete(sequence)
+    database.commit()
+    return {"ok": True}
