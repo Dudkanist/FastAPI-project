@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python junk
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Секреты
+.env
+
+# Тесты и Линтеры
+tests/
+.pytest_cache/
+.pylintrc
+pylint.txt
+pytest.txt
+.coverage
+htmlcov/
+
+# Базы данных
+*.db
+*.sqlite3
+
+# Документация и лишнее
+README.md
+LICENSE
+.vscode/
+.idea/
