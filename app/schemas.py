@@ -1,14 +1,17 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 # --- Схемы для Пользователя ---
 
+
 class UserBase(BaseModel):
     email: str
 
+
 class UserCreate(UserBase):
     password: str
+
 
 class UserResponse(UserBase):
     id: int
@@ -17,6 +20,7 @@ class UserResponse(UserBase):
 
 
 # --- Схемы для Результатов Анализа ---
+
 
 class AnalysisResultBase(BaseModel):
     gc_content: float
@@ -27,6 +31,7 @@ class AnalysisResultBase(BaseModel):
 
 # --- Схемы для Последовательностей ---
 
+
 class SequenceBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -34,8 +39,10 @@ class SequenceBase(BaseModel):
     raw_sequence: str = Field(..., pattern=r"^[ATGCatgc\s]+$")
     molecule_type: str = "DNA"
 
+
 class SequenceCreate(SequenceBase):
     pass
+
 
 class SequenceResponse(SequenceBase):
     id: int
@@ -43,5 +50,5 @@ class SequenceResponse(SequenceBase):
     created_at: datetime
     # Если анализ уже проведен, мы можем включить его в ответ
     analysis: Optional[AnalysisResultBase] = None
-    
+
     model_config = ConfigDict(from_attributes=True)

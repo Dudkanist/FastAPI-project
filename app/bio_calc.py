@@ -4,19 +4,21 @@ def clean_sequence(seq: str) -> str:
     """
     return seq.replace(" ", "").upper()
 
+
 def calculate_gc_content(seq: str) -> float:
     """
     Расчет процента G и C в последовательности
     """
-    
+
     if not seq:
         return 0.0
-    
+
     seq = clean_sequence(seq)
-    g_count = seq.count('G')
-    c_count = seq.count('C')
-    
+    g_count = seq.count("G")
+    c_count = seq.count("C")
+
     return round(((g_count + c_count) / len(seq)) * 100, 2)
+
 
 def calculate_melting_temp(seq: str) -> float:
     """
@@ -26,21 +28,22 @@ def calculate_melting_temp(seq: str) -> float:
     """
     seq = clean_sequence(seq)
     length = len(seq)
-    
+
     if length == 0:
         return 0.0
-        
-    a_count = seq.count('A')
-    t_count = seq.count('T')
-    g_count = seq.count('G')
-    c_count = seq.count('C')
-    
+
+    a_count = seq.count("A")
+    t_count = seq.count("T")
+    g_count = seq.count("G")
+    c_count = seq.count("C")
+
     if length < 14:
         tm = (a_count + t_count) * 2 + (g_count + c_count) * 4
     else:
         tm = 64.9 + 41 * (g_count + c_count - 16.4) / length
-        
+
     return round(tm, 2)
+
 
 def calculate_molecular_weight(seq: str) -> float:
     """
@@ -48,10 +51,10 @@ def calculate_molecular_weight(seq: str) -> float:
     A: 313.2, T: 304.2, G: 329.2, C: 289.2, фосфатный остов: 61.96
     """
     seq = clean_sequence(seq)
-    weights = {'A': 313.2, 'T': 304.2, 'G': 329.2, 'C': 289.2}
-    
+    weights = {"A": 313.2, "T": 304.2, "G": 329.2, "C": 289.2}
+
     weight = sum(weights.get(base, 0) for base in seq)
     # Вычитаем воду, которая уходит при образовании фосфодиэфирной связи
-    weight -= 61.96 * max(0, len(seq) - 1) 
-    
+    weight -= 61.96 * max(0, len(seq) - 1)
+
     return round(weight, 2)
