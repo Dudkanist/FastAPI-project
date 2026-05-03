@@ -1,9 +1,25 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 venv/
-env/
-.env
+ENV/
+
+# Databases
+*.db
 *.sqlite3
-.idea/
-.vscode/
+
+# Environment & Secrets
+.env
+!.env.example
+
+# Testing & Linting
+.pytest_cache/
+.pylintrc
+htmlcov/
+.coverage
+.coverage.*
+
+# OS
+.DS_Store

@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: /home/dudkan/projects/fastAPI
+plugins: anyio-4.13.0
+collected 3 items
+
+tests/test_main.py ...                                                   [100%]
+
+=============================== warnings summary ===============================
+../../miniconda3/envs/main/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /home/dudkan/miniconda3/envs/main/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/db.py:18
+  /home/dudkan/projects/fastAPI/app/db.py:18: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+tests/test_main.py::test_bio_logic
+  /home/dudkan/projects/fastAPI/app/auth.py:30: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + timedelta(minutes=15)
+
+tests/test_main.py::test_bio_logic
+  /home/dudkan/miniconda3/envs/main/lib/python3.12/site-packages/sqlalchemy/sql/schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 3 passed, 4 warnings in 1.01s =========================

@@ -2,6 +2,7 @@ from typing import Annotated, List
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app import auth, bio_calc, db, models, schemas
@@ -34,7 +35,7 @@ def get_current_user(token: TokenData, database: DbSession) -> models.User:
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-    except auth.JWTError:
+    except JWTError:
         raise credentials_exception
 
     user = database.query(models.User).filter(models.User.email == email).first()
