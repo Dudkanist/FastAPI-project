@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   web:
     build: .
-    container_name: genevault_api
+    container_name: GeneVault_FastAPI
     ports:
       - "8000:8000"
     env_file:
       - .env
     volumes:
-      - .:/code
+      - .:/fastapi-project

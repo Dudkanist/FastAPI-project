@@ -1,6 +1,6 @@
 from typing import Annotated, List
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Body, Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -10,20 +10,25 @@ from app import auth, bio_calc, db, models, schemas
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=db.engine)
 
-app = FastAPI(title="GeneVault API")
+app = FastAPI(
+    title="GeneVault API",
+    description="Bioinformatics Sequence Storage & Analysis",
+    version="1.0.0",
+)
 
-# --- Настройка безопасности и зависимостей ---
+
+# 1. НАСТРОЙКА БЕЗОПАСНОСТИ И ЗАВИСИМОСТЕЙ
+
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Псевдонимы типов для чистоты сигнатур функций
+# Псевдонимы типов для чистоты сигнатур
 DbSession = Annotated[Session, Depends(db.get_db)]
 TokenData = Annotated[str, Depends(oauth2_scheme)]
 
 
 def get_current_user(token: TokenData, database: DbSession) -> models.User:
-    """
-    Извлекает и проверяет текущего пользователя из JWT-токена.
-    """
+    """Извлекает и проверяет текущего пользователя из JWT-токена."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -47,11 +52,11 @@ def get_current_user(token: TokenData, database: DbSession) -> models.User:
     return user
 
 
-# Зависимость для получения текущего пользователя
+# Единая зависимость для получения текущего пользователя
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
-# --- Эндпоинты ---
+# 2. СЛУЖЕБНЫЕ ЭНДПОИНТЫ
 
 
 @app.get("/", tags=["Healthcheck"])
@@ -59,11 +64,23 @@ async def root():
     return {"status": "alive", "database": "connected"}
 
 
+@app.get("/about/info", tags=["Healthcheck"])
+def get_app_info():
+    """Информация о версии приложения."""
+    return {
+        "app": app.title,
+        "version": app.version,
+        "status": "stable",
+        "description": app.description,
+    }
+
+
+# 3. АВТОРИЗАЦИЯ И ПОЛЬЗОВАТЕЛИ
+
+
 @app.post("/register", response_model=schemas.UserResponse, tags=["Auth"])
 def register_user(user: schemas.UserCreate, database: DbSession):
-    """
-    Создает нового пользователя, хеширует пароль и сохраняет его в БД.
-    """
+    """Создает нового пользователя, хеширует пароль и сохраняет его в БД."""
     db_user = (
         database.query(models.User).filter(models.User.email == user.email).first()
     )
@@ -87,9 +104,7 @@ def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     database: DbSession,
 ):
-    """
-    Принимает логин/пароль, проверяет их и выдает временный JWT-токен.
-    """
+    """Принимает логин/пароль, проверяет их и выдает временный JWT-токен."""
     user = (
         database.query(models.User)
         .filter(models.User.email == form_data.username)
@@ -107,16 +122,22 @@ def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@app.get("/users/me", response_model=schemas.UserResponse, tags=["Users"])
+def get_user_me(current_user: CurrentUser):
+    """Получить данные текущего авторизованного пользователя."""
+    return current_user
+
+
+# 4. ПОСЛЕДОВАТЕЛЬНОСТИ (SEQUENCES)
+
+
 @app.post("/sequences/", response_model=schemas.SequenceResponse, tags=["Sequences"])
 def create_sequence(
     sequence: schemas.SequenceCreate,
     current_user: CurrentUser,
     database: DbSession,
 ):
-    """
-    Сохраняет ДНК-последовательность и автоматически запускает анализ.
-    """
-    # 1. Формируем запись последовательности
+    """Сохраняет ДНК-последовательность и автоматически запускает анализ."""
     db_sequence = models.Sequence(
         name=sequence.name,
         description=sequence.description,
@@ -125,22 +146,17 @@ def create_sequence(
         owner_id=current_user.id,
     )
     database.add(db_sequence)
-
-    # flush() отправляет запрос в БД и получает ID, но не фиксирует транзакцию
     database.flush()
 
-    # 2. Считаем параметры
     gc = bio_calc.calculate_gc_content(db_sequence.raw_sequence)
     tm = bio_calc.calculate_melting_temp(db_sequence.raw_sequence)
     mw = bio_calc.calculate_molecular_weight(db_sequence.raw_sequence)
 
-    # 3. Сохраняем результаты анализа
     db_analysis = models.AnalysisResult(
         sequence_id=db_sequence.id, gc_content=gc, melting_temp=tm, molecular_weight=mw
     )
     database.add(db_analysis)
 
-    # Делаем один commit на обе операции (атомарность транзакции)
     database.commit()
     database.refresh(db_sequence)
 
@@ -156,9 +172,7 @@ def read_sequences(
     skip: int = 0,
     limit: int = 100,
 ):
-    """
-    Возвращает список последовательностей текущего пользователя.
-    """
+    """Возвращает список последовательностей текущего пользователя."""
     return (
         database.query(models.Sequence)
         .filter(models.Sequence.owner_id == current_user.id)
@@ -166,6 +180,17 @@ def read_sequences(
         .limit(limit)
         .all()
     )
+
+
+@app.get("/sequences/count/total", tags=["Sequences"])
+def get_sequences_count(current_user: CurrentUser, database: DbSession):
+    """Узнать общее количество сохраненных последовательностей."""
+    count = (
+        database.query(models.Sequence)
+        .filter(models.Sequence.owner_id == current_user.id)
+        .count()
+    )
+    return {"total_count": count}
 
 
 @app.get(
@@ -178,9 +203,7 @@ def read_sequence(
     current_user: CurrentUser,
     database: DbSession,
 ):
-    """
-    Получение детальной информации о конкретной записи и результатах её анализа.
-    """
+    """Получение детальной информации о конкретной записи и результатах её анализа."""
     sequence = (
         database.query(models.Sequence)
         .filter(
@@ -198,6 +221,39 @@ def read_sequence(
     return sequence
 
 
+@app.patch(
+    "/sequences/{sequence_id}/rename",
+    response_model=schemas.SequenceResponse,
+    tags=["Sequences"],
+)
+def rename_sequence(
+    sequence_id: int,
+    new_name: Annotated[str, Body(embed=True)],
+    current_user: CurrentUser,
+    database: DbSession,
+):
+    """Быстро изменить название последовательности."""
+    db_seq = (
+        database.query(models.Sequence)
+        .filter(
+            models.Sequence.id == sequence_id,
+            models.Sequence.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not db_seq:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sequence not found"
+        )
+
+    db_seq.name = new_name
+    database.commit()
+    database.refresh(db_seq)
+
+    return db_seq
+
+
 @app.delete(
     "/sequences/{sequence_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -208,9 +264,7 @@ def delete_sequence(
     current_user: CurrentUser,
     database: DbSession,
 ):
-    """
-    Удаление данных из системы.
-    """
+    """Удаление данных из системы."""
     sequence = (
         database.query(models.Sequence)
         .filter(
@@ -225,12 +279,26 @@ def delete_sequence(
             status_code=status.HTTP_404_NOT_FOUND, detail="Sequence not found"
         )
 
-    # Удаляем зависимости, если каскадное удаление не настроено на уровне ORM
     if sequence.analysis:
         database.delete(sequence.analysis)
 
     database.delete(sequence)
     database.commit()
 
-    # 204 статус обязывает не возвращать тело ответа
     return None
+
+
+# 5. АНАЛИТИКА (ANALYSIS)
+
+
+@app.get(
+    "/analysis/all", response_model=List[schemas.AnalysisResultBase], tags=["Analysis"]
+)
+def get_all_analysis_results(current_user: CurrentUser, database: DbSession):
+    """Получить список всех проведенных анализов пользователя."""
+    return (
+        database.query(models.AnalysisResult)
+        .join(models.Sequence)
+        .filter(models.Sequence.owner_id == current_user.id)
+        .all()
+    )
