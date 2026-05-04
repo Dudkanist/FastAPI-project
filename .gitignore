@@ -16,7 +16,6 @@ ENV/
 
 # Testing & Linting
 .pytest_cache/
-.pylintrc
 htmlcov/
 .coverage
 .coverage.*
